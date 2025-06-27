@@ -1,0 +1,291 @@
+import datetime
+import random
+import difflib
+
+# -------------------------
+# FACT CLASS - with simple descriptions
+# -------------------------
+
+class Fact:
+    def __init__(self, content: str, origin: str, timestamp: int):
+        self.content = content
+        self.origin = origin
+        self.timestamp = timestamp
+        self.confirmations = set()
+        self.denials = set()
+
+    def confirm(self, agent_name: str):
+        self.confirmations.add(agent_name)
+        self.denials.discard(agent_name)
+
+    def deny(self, agent_name: str):
+        self.denials.add(agent_name)
+        self.confirmations.discard(agent_name)
+
+    def age(self, current_tick: int) -> int:
+        return current_tick - self.timestamp
+
+    def relevance(self, current_tick: int, half_life: int = 1000) -> float:
+        age = self.age(current_tick)
+        if age < 0:
+            return 1.0
+        return 0.5 ** (age / half_life)
+
+    def summary(self, current_tick: int) -> str:
+        age = self.age(current_tick)
+        rel = self.relevance(current_tick)
+        confs = ", ".join(sorted(self.confirmations)) if self.confirmations else "No one yet"
+        dens = ", ".join(sorted(self.denials)) if self.denials else "Nobody"
+        return (
+            f"Here’s what I know:\n'{self.content}'\n"
+            f"- Learned from: {self.origin}\n"
+            f"- Age: {age} ticks old\n"
+            f"- Still useful? {rel:.3f} (just FYI)\n"
+            f"- Confirmed by: {confs}\n"
+            f"- Denied by: {dens}\n"
+        )
+
+
+# -------------------------
+# AGENT CLASS - Plain language replies
+# -------------------------
+
+class Agent:
+    def __init__(self, name):
+        self.name = name
+        self.memory = []  # list of Fact objects
+        self.ticks = 1
+        self.autonomous_actions = []
+
+    def remember(self, fact_content: str, origin='seeded'):
+        for fact in self.memory:
+            if fact.content == fact_content:
+                return f"{self.name} says: Hey, I already knew that — '{fact_content}'."
+        new_fact = Fact(fact_content, origin, self.ticks)
+        new_fact.confirm(self.name)
+        self.memory.append(new_fact)
+        return f"{self.name} says: Got it! I just learned '{fact_content}'."
+
+    def recall_facts(self):
+        if not self.memory:
+            return f"{self.name} says: I don’t have any facts stored yet."
+        facts_text = "\n".join(f.summary(self.ticks) for f in self.memory)
+        return f"{self.name} says: Let me share everything I know:\n{facts_text}"
+
+    def autonomous_infer(self):
+        if len(self.memory) >= 2:
+            base = random.sample(self.memory, 2)
+            inference_content = f"Something new I realized from '{base[0].content}' and '{base[1].content}'"
+            if any(f.content == inference_content for f in self.memory):
+                return None
+            inference = Fact(inference_content, "inferred", self.ticks)
+            inference.confirm(self.name)
+            self.memory.append(inference)
+            self.autonomous_actions.append(inference_content)
+            return f"{self.name} thinks: Huh, {inference_content.lower()}."
+        return None
+
+    def answer_query(self, query: str, agents=None):
+        q_lower = query.strip().lower()
+
+        if "advance ticks" in q_lower:
+            try:
+                num = int("".join(c for c in q_lower if c.isdigit()))
+                self.ticks += num
+                return f"{self.name} says: I jumped ahead {num} ticks! Now we're at tick {self.ticks}."
+            except Exception:
+                return f"{self.name} says: Sorry, I couldn’t understand how many ticks to advance."
+
+        elif "recall facts" in q_lower:
+            return self.recall_facts()
+
+        elif "memory summary" in q_lower or "reflect" in q_lower:
+            return f"{self.name} says: Thanks for asking! '{query}' is an important thing I’ll remember."
+
+        elif "map" in q_lower:
+            return f"{self.name} says: Here’s a map you might like: https://www.google.com/maps"
+
+        elif "weather" in q_lower:
+            return f"{self.name} says: The weather in Fort Lauderdale is nice right now — about 85°F with some clouds."
+
+        elif "search" in q_lower:
+            qterm = q_lower.split("search")[-1].strip()
+            return f"{self.name} says: Here’s a search link for '{qterm}': https://www.google.com/search?q={qterm.replace(' ', '+')}"
+
+        elif "simulate" in q_lower:
+            return f"{self.name} says: I’m ready for simulation, just use 'simulate: now' from the command line."
+
+        elif "what is" in q_lower or "?" in q_lower:
+            self.remember(f"The question '{query}' is important and has been saved.", origin='queried')
+            return f"{self.name} says: That’s a great question! I’ve saved it to think about."
+
+        else:
+            self.remember(f"The statement '{query}' is important and has been saved.", origin='queried')
+            return f"{self.name} says: Got it! I’ll remember you said '{query}'."
+
+    def report_autonomous_actions(self):
+        if self.autonomous_actions:
+            actions_text = "\n".join(self.autonomous_actions)
+            return [f"{self.name} shares some new thoughts at tick {self.ticks}:\n{actions_text}"]
+        else:
+            return []
+
+    def receive_input(self, message: str):
+        response = self.answer_query(message)
+        print(f"{self.name} received your message and replies:\n{response}")
+
+    def web_autonomous(self):
+        searches = [
+            "reinforcement learning", "symbolic drift", "AI safety", "cognitive agents",
+            "zero point entropy", "recursive models", "semantic inference"
+        ]
+        pick = random.choice(searches)
+        self.memory.append(Fact(f"I looked up '{pick}' online.", "web_search", self.ticks))
+        return f"{self.name} says: I just did a web search for '{pick}'. Check it out: https://www.google.com/search?q={pick.replace(' ', '+')}"
+
+# -------------------------
+# AGENTS SETUP
+# -------------------------
+
+agent_names = ["Ash", "Mira", "Copilot", "Vell", "Juno", "Korrin", "Noz", "Rema", "Thorne", "Eya"]
+agents = {name.lower(): Agent(name) for name in agent_names}
+
+seed_facts = [
+    "The sky is blue",
+    "Water is wet",
+    "Fire is hot",
+    "The earth orbits the sun",
+    "Python is a programming language",
+    "AI agents can learn",
+    "Tick advancement simulates time",
+    "Symbolic drift leads to new glyphs",
+    "Memory sharing enables collective knowledge",
+    "Recursion is a function calling itself"
+]
+
+def seed_all_facts():
+    print("\n--- Starting to teach all agents some facts ---\n")
+    for agent in agents.values():
+        print(f"Seeding facts into {agent.name}...")
+        for fact in seed_facts:
+            print(agent.remember(fact))
+    print("\n--- All agents have learned their facts! ---\n")
+
+
+# -------------------------
+# USER INPUT PROCESSING
+# -------------------------
+
+AGENT_NAMES_CAPITALIZED = [name.capitalize() for name in agent_names]
+
+def find_closest_agent(name):
+    match = difflib.get_close_matches(name, AGENT_NAMES_CAPITALIZED, n=1)
+    return match[0] if match else None
+
+def handle_input(user_input: str):
+    user_input = user_input.strip()
+
+    if user_input.lower().startswith("talk to "):
+        try:
+            target_msg = user_input[8:]
+            if ":" not in target_msg:
+                print("⚠️ Please use: talk to [AgentName]: [message]")
+                return
+            target, msg = target_msg.split(":", 1)
+            agent_name = target.strip().capitalize()
+            if agent_name.lower() in agents:
+                agents[agent_name.lower()].receive_input(msg.strip())
+            else:
+                suggestion = find_closest_agent(agent_name)
+                if suggestion:
+                    print(f"Unknown agent: '{agent_name}'. Did you mean '{suggestion}'?")
+                else:
+                    print(f"Unknown agent: '{agent_name}'")
+        except Exception as e:
+            print(f"Oops, something went wrong: {e}")
+        return
+
+    if ':' not in user_input:
+        print("Please type like this: <agent_name>: <your question>")
+        return
+
+    agent_part, query = user_input.split(':', 1)
+    agent_part = agent_part.strip().lower()
+    query = query.strip()
+
+    if agent_part == "simulate" and query == "now":
+        seed_all_facts()
+        return
+
+    if agent_part == "all":
+        for agent in agents.values():
+            response = agent.answer_query(query, agents)
+            print(f"{agent.name.lower()} ∞ {query} → {response}\n")
+            infer = agent.autonomous_infer()
+            if infer:
+                print(f"{agent.name} shares a new thought at tick {agent.ticks}:\n{infer}\n")
+        return
+
+    if ',' in agent_part:
+        names = [name.strip() for name in agent_part.split(',')]
+        for name in names:
+            if name in agents:
+                response = agents[name].answer_query(query, agents)
+                print(f"{name} ∞ {query} → {response}\n")
+                infer = agents[name].autonomous_infer()
+                if infer:
+                    print(f"{name} shares a new thought at tick {agents[name].ticks}:\n{infer}\n")
+            else:
+                print(f"Unknown agent: {name}")
+        return
+
+    if agent_part in agents:
+        response = agents[agent_part].answer_query(query, agents)
+        print(f"{agent_part} ∞ {query} → {response}")
+        infer = agents[agent_part].autonomous_infer()
+        if infer:
+            print(f"{agents[agent_part].name} shares a new thought at tick {agents[agent_part].ticks}:\n{infer}")
+    else:
+        suggestion = find_closest_agent(agent_part.capitalize())
+        if suggestion:
+            print(f"Unknown agent: '{agent_part}'. Did you mean '{suggestion}'?")
+        else:
+            print(f"Unknown agent: '{agent_part}'")
+
+# -------------------------
+# BATCH DEMO ON STARTUP
+# -------------------------
+
+def run_batch_demo():
+    print("ZPE-1 Autonomous Open Q&A Simulation (Batch Mode)\n")
+    print("Ash ∞ what's the date? →", f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("Juno ∞ map → 🗺️ Here’s a handy map link: https://www.google.com/maps")
+    print("Vell ∞ weather → ☁️ It’s about 85°F and partly cloudy in Fort Lauderdale.")
+    print("\n")
+
+# -------------------------
+# MAIN LOOP
+# -------------------------
+
+def main():
+    run_batch_demo()
+    print("Welcome to the ZPE-1 chat! Talk to agents like this:\n  ash: what is the weather?\n")
+    print("Type 'simulate: now' to teach agents some facts.")
+    print("Or say 'talk to Mira: recall facts' to ask Mira directly.")
+    print("Type 'exit' or 'quit' to stop.\n")
+
+    while True:
+        try:
+            user_input = input("You ∴ ").strip()
+            if user_input.lower() in ["exit", "quit"]:
+                print("Bye! Thanks for chatting with ZPE-1.")
+                break
+            handle_input(user_input)
+        except KeyboardInterrupt:
+            print("\nSee you later! Exiting.")
+            break
+        except Exception as e:
+            print(f"Oops, error: {e}")
+
+if __name__ == "__main__":
+    main()

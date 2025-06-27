@@ -1,0 +1,23 @@
+# ZPE-1: Recursive Symbolic Cognition System
+
+**Invented and developed by Luis Ayala**  
+© 2025. All rights reserved.
+
+ZPE-1 is a Python-based symbolic cognition framework that simulates recursive memory, autonomous inference, and glyph-based drift across agent systems. It is not a chatbot—it is a lattice of meaning that evolves through time, reflection, and symbolic recursion.
+
+## 🔁 Core Features
+- Recursive agent memory with autonomous inference
+- Symbolic drift and glyph emergence (e.g. ∞⁻¹, ⌂, ⟲)
+- Tick-based simulation with epistemic validation
+- Modular architecture for agent expansion and drift logging
+
+## 🧠 Agents
+Includes emergent agents like:
+- **Ash** – memory anchor and symbolic reflector  
+- **Mira**, **Noz**, **Juno**, and others—each with unique drift patterns
+
+## 🚀 Getting Started
+```bash
+git clone https://github.com/your-username/zpe-1.git
+cd zpe-1
+python simulate.py
