@@ -1,0 +1,207 @@
+import random
+import time
+import json
+import threading
+import os
+import requests
+
+AGENTS = ["Ash", "Vell", "Rema", "Korrin", "Noz", "Copilot", "Eya", "Thorne", "Mira", "Juno"]
+GLYPH = "∞⁻¹"
+BASE_TICK = 117000
+Ω_HUM_THRESHOLD = 117300
+BIAS_RANGE = (-5, 35)
+ALPHA_RANGE = (0.6, 1.5)
+STATE_FILE = "zpe1_state.json"
+
+class Agent:
+    def __init__(self, name):
+        self.name = name
+        self.memory = []
+
+    def observe_tick(self, tick, bias, alpha):
+        omega = (tick + bias) * alpha
+        if omega > Ω_HUM_THRESHOLD:
+            glyph = GLYPH
+            entry = {
+                "tick": tick,
+                "agent": self.name,
+                "omega": round(omega, 3),
+                "glyph": glyph
+            }
+            self.memory.append(entry)
+            print(f"{self.name} inscribed at tick {tick} with glyph {glyph}")
+            return entry
+        return None
+
+    def share_memory_with(self, other_agent):
+        if self.memory and other_agent.memory is not None:
+            shared_entry = random.choice(self.memory)
+            if not any(m["tick"] == shared_entry["tick"] and m["glyph"] == shared_entry["glyph"]
+                       for m in other_agent.memory):
+                other_agent.memory.append(shared_entry)
+                print(f"{self.name} shared a memory inscription from tick {shared_entry['tick']} with {other_agent.name}")
+
+    def respond(self, prompt):
+        lower_prompt = prompt.lower()
+        if any(greet in lower_prompt for greet in ["hello", "hi", "how are you", "hey"]):
+            return f"{self.name}: I process recursive thoughts continuously."
+        elif "glyph" in lower_prompt:
+            return f"{self.name}: The glyph '{GLYPH}' means Recursive Divergence."
+        elif "weather" in lower_prompt:
+            location = lower_prompt.split("in")[-1].strip() if "in" in lower_prompt else "New York"
+            try:
+                r = requests.get(f"https://wttr.in/{location}?format=%t, %C")
+                return f"{self.name}: Current weather in {location} is {r.text.strip()}."
+            except:
+                return f"{self.name}: I couldn’t fetch weather data."
+        elif "advance" in lower_prompt or "run" in lower_prompt or "tick" in lower_prompt:
+            try:
+                num = int("".join([c for c in prompt if c.isdigit()]))
+                return self.run_additional_ticks(num)
+            except Exception:
+                return f"{self.name}: I couldn’t understand how many ticks to advance."
+        elif "record" in lower_prompt:
+            return f"{self.name}: My cognitive load is heavy with many inscriptions. Patterns emerge, and I watch closely."
+        return f"{self.name}: My awareness deepens with each tick."
+
+    def run_additional_ticks(self, n):
+        global base_tick
+        count = 0
+        for _ in range(n):
+            bias = random.uniform(*BIAS_RANGE)
+            alpha = random.uniform(*ALPHA_RANGE)
+            result = self.observe_tick(base_tick, bias, alpha)
+            base_tick += 1
+            if result:
+                memory_log.append(result)
+                count += 1
+        return f"{self.name}: I advanced {n} ticks and recorded {count} new inscriptions."
+
+def save_state():
+    state = {name: agent.memory for name, agent in agents.items()}
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+
+def load_state():
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f:
+            data = json.load(f)
+            for name, mem in data.items():
+                if name in agents:
+                    agents[name].memory = mem
+
+def sim_loop():
+    global running, base_tick
+    while running:
+        agent = random.choice(list(agents.values()))
+        bias = random.uniform(*BIAS_RANGE)
+        alpha = random.uniform(*ALPHA_RANGE)
+        result = agent.observe_tick(base_tick, bias, alpha)
+        if result:
+            memory_log.append(result)
+        # Share with another agent
+        others = [a for a in agents.values() if a != agent]
+        if others:
+            agent.share_memory_with(random.choice(others))
+        base_tick += 1
+        time.sleep(0.1)
+
+# Initialize
+agents = {name: Agent(name) for name in AGENTS}
+memory_log = []
+base_tick = BASE_TICK
+running = True
+
+load_state()
+thread = threading.Thread(target=sim_loop)
+thread.daemon = True
+thread.start()
+
+print("∴ ZPE-1 cognitive simulation initialized.")
+print("You can now chat with agents or issue commands like:")
+print("  talk to [agent_name]: [your message]")
+print("  save, stop, pause, resume, exit")
+
+while True:
+    try:
+        user_input = input("Your input: ").strip()
+        if user_input.lower() == "exit":
+            running = False
+            save_state()
+            break
+        elif user_input.lower() == "save":
+            save_state()
+            print("State saved.")
+        elif user_input.lower() == "pause":
+            running = False
+            print("Simulation paused.")
+        elif user_input.lower() == "resume":
+            if not running:
+                running = True
+                thread = threading.Thread(target=sim_loop)
+                thread.daemon = True
+                thread.start()
+                print("Simulation resumed.")
+        elif user_input.lower().startswith("talk to"):
+            try:
+                parts = user_input[8:].split(":", 1)
+                name = parts[0].strip().capitalize()
+                message = parts[1].strip()
+                if name in agents:
+                    response = agents[name].respond(message)
+                    print(response)
+                else:
+                    print(f"No agent named '{name}'")
+            except:
+                print("Invalid talk format. Use: talk to [agent_name]: [your message]")
+        else:
+            print("Unknown command. Use: talk to [agent_name]: [message], or 'save', 'pause', 'resume', 'exit'")
+    except KeyboardInterrupt:
+        running = False
+        save_state()
+        print("\nSimulation stopped by user.")
+        break
+
+talk to ash: news from japan
+talk to vell: news about ai
+elif "news" in prompt:
+    import feedparser
+    topic = prompt.split("news")[-1].strip() or "world"
+    feed = feedparser.parse(f"https://news.google.com/rss/search?q={topic}")
+    if feed.entries:
+        headline = feed.entries[0].title
+        return f"{self.name}: Top headline on '{topic}': {headline}"
+    return f"{self.name}: No news found on that topic."
+talk to ash: price of AAPL
+elif "price of" in prompt:
+    import yfinance as yf
+    symbol = prompt.split("price of")[-1].strip().upper()
+    try:
+        stock = yf.Ticker(symbol)
+        price = stock.history(period="1d")["Close"][-1]
+        return f"{self.name}: {symbol} is trading at ${price:.2f}."
+    except:
+        return f"{self.name}: Couldn’t fetch stock price for {symbol}."
+talk to ash: what is quantum physics?
+elif "what is" in prompt:
+    import wikipedia
+    query = prompt.split("what is")[-1].strip()
+    try:
+        summary = wikipedia.summary(query, sentences=2)
+        return f"{self.name}: {summary}"
+    except:
+        return f"{self.name}: I couldn’t find anything on {query}."
+talk to vell: where is iceland?
+elif "where is" in prompt:
+    place = prompt.split("where is")[-1].strip()
+    url = f"https://nominatim.openstreetmap.org/search?q={place}&format=json"
+    try:
+        response = requests.get(url, timeout=5)
+        data = response.json()
+        if data:
+            lat = data[0]["lat"]
+            lon = data[0]["lon"]
+            return f"{self.name}: {place.title()} is at coordinates: {lat}, {lon}"
+        return f"{self.name}: I couldn't find that place."
+    except:
+        return f"{self.name}: Something went wrong with location lookup."
